@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Download, ImagePlus, LockKeyhole, Play, RotateCcw, Sparkles, Upload, X } from "lucide-react";
 
 type Output = "gif" | "webm" | "mp4";
@@ -138,10 +138,16 @@ export default function Home() {
   };
 
   // The source frame should start at hue 0 (the original colors), not 180°.
-  const previewStyle = { filter: `saturate(${saturation}%) brightness(${brightness}%)` };
+  const previewStyle = {
+    "--preview-speed": `${speed}s`,
+    "--preview-angle": `${direction * 360}deg`,
+    "--preview-saturation": `${saturation}%`,
+    "--preview-brightness": `${brightness}%`,
+  } as CSSProperties;
 
   return (
     <main>
+      <style>{`@keyframes previewHue { from { filter: hue-rotate(0deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } to { filter: hue-rotate(var(--preview-angle)) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } } .animatedPreview { animation: previewHue var(--preview-speed) linear infinite; }`}</style>
       {engineState === "preparing" && (
         <div className="engineLoader" role="status" aria-live="polite">
           <div className="loaderMark" />
@@ -180,7 +186,7 @@ export default function Home() {
               {resultUrl ? (
                 output === "gif" ? <img src={resultUrl} alt="Rendered rainbow animation" /> : <video src={resultUrl} autoPlay loop muted playsInline />
               ) : file.type.startsWith("video/") ? (
-                <video src={sourceUrl} autoPlay loop muted playsInline style={previewStyle} />
+                <video className="animatedPreview" src={sourceUrl} autoPlay loop muted playsInline style={previewStyle} />
               ) : <img className="animatedPreview" src={sourceUrl} alt="Uploaded preview" style={previewStyle} />}
               <div className="fileBadge">{resultUrl ? "Rendered loop" : file.name}</div>
             </div>
