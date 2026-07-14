@@ -58,16 +58,11 @@ export default function Home() {
         const { fps, totalFrames } = renderInfoRef.current;
         if (totalFrames) setFrame(Math.min(totalFrames, Math.max(1, Math.floor((time / 1_000_000) * fps) + 1)));
       });
-      const wasmParts = await Promise.all([
-        fetch("/ffmpeg/ffmpeg-core.wasm.0").then((response) => { if (!response.ok) throw new Error("Could not load FFmpeg engine part 1"); return response.arrayBuffer(); }),
-        fetch("/ffmpeg/ffmpeg-core.wasm.1").then((response) => { if (!response.ok) throw new Error("Could not load FFmpeg engine part 2"); return response.arrayBuffer(); }),
-      ]);
-      const wasmURL = URL.createObjectURL(new Blob(wasmParts, { type: "application/wasm" }));
-      try {
-        await ffmpeg.load({ coreURL: "/ffmpeg/ffmpeg-core.js", wasmURL });
-      } finally {
-        URL.revokeObjectURL(wasmURL);
-      }
+      const coreBase = "https://cdn.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm";
+      await ffmpeg.load({
+        coreURL: `${coreBase}/ffmpeg-core.js?v=ca9026c`,
+        wasmURL: `${coreBase}/ffmpeg-core.wasm?v=ca9026c`,
+      });
       ffmpegRef.current = ffmpeg;
       setEngineState("ready");
       return ffmpeg;
