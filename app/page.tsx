@@ -31,12 +31,15 @@ export default function Home() {
   const [fps, setFps] = useState(12);
   const [output, setOutput] = useState<Output>("gif");
   const [progress, setProgress] = useState(0);
+  const [frame, setFrame] = useState(0);
+  const [totalFrames, setTotalFrames] = useState(0);
   const [status, setStatus] = useState("Ready when you are");
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [engineState, setEngineState] = useState<"preparing" | "ready" | "failed">("preparing");
   const ffmpegRef = useRef<import("@ffmpeg/ffmpeg").FFmpeg | null>(null);
   const loadingRef = useRef<Promise<import("@ffmpeg/ffmpeg").FFmpeg> | null>(null);
+  const renderInfoRef = useRef({ fps: 12, totalFrames: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => ffmpegRef.current?.terminate(), []);
@@ -49,7 +52,11 @@ export default function Home() {
         import("@ffmpeg/ffmpeg")
       ]);
       const ffmpeg = new FFmpeg();
-      ffmpeg.on("progress", ({ progress: p }) => setProgress(Math.min(99, Math.round(p * 100))));
+      ffmpeg.on("progress", ({ progress: p, time }) => {
+        setProgress(Math.min(99, Math.round(p * 100)));
+        const { fps, totalFrames } = renderInfoRef.current;
+        if (totalFrames) setFrame(Math.min(totalFrames, Math.max(1, Math.floor((time / 1_000_000) * fps) + 1)));
+      });
       await ffmpeg.load({
         coreURL: "/ffmpeg/ffmpeg-core.js",
         wasmURL: "/ffmpeg/ffmpeg-core.wasm",
@@ -95,7 +102,9 @@ export default function Home() {
 
   const render = async () => {
     if (!file || busy) return;
-    setBusy(true); setProgress(0); setStatus(engineState === "ready" ? "Starting the renderer…" : "Preparing the FFmpeg engine…");
+    const frameCount = Math.ceil(speed * fps);
+    renderInfoRef.current = { fps, totalFrames: frameCount };
+    setBusy(true); setProgress(0); setFrame(0); setTotalFrames(frameCount); setStatus(engineState === "ready" ? "Starting the renderer…" : "Preparing the FFmpeg engine…");
     try {
       const [{ fetchFile }, ffmpeg] = await Promise.all([import("@ffmpeg/util"), loadFfmpeg()]);
       setStatus("Painting every frame…");
@@ -192,7 +201,7 @@ export default function Home() {
             </div>
           )}
           <input ref={inputRef} hidden type="file" accept="image/*,video/*" onChange={(e) => chooseFile(e.target.files?.[0])}/>
-          <div className="statusRow"><span>{status}</span><span>{busy && progress === 0 ? "working…" : `${progress}%`}</span></div>
+          <div className="statusRow"><span>{busy && frame > 0 ? `Rendering frame ${frame} / ${totalFrames}` : status}</span><span>{busy && frame > 0 ? `${progress}%` : busy && progress === 0 ? "working…" : `${progress}%`}</span></div>
           <div className="progress"><i style={{ width: `${busy && progress === 0 ? 18 : progress}%` }} /></div>
         </div>
 
