@@ -74,7 +74,9 @@ export default function Home() {
       if (!ffmpeg) {
         ffmpeg = new FFmpeg();
         ffmpeg.on("progress", ({ progress: p }) => setProgress(Math.min(99, Math.round(p * 100))));
-        const core = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm";
+        // UMD build is the browser-compatible distribution recommended by
+        // ffmpeg.wasm. Convert it to Blob URLs to avoid cross-origin workers.
+        const core = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
         const [coreURL, wasmURL] = await Promise.all([
           toBlobURL(`${core}/ffmpeg-core.js`, "text/javascript"),
           toBlobURL(`${core}/ffmpeg-core.wasm`, "application/wasm"),
