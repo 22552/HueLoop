@@ -1,0 +1,38 @@
+name: Build HueLoop mobile FFmpeg core
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - core-build/**
+      - .github/workflows/build-mobile-core.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: hueloop
+      - name: Fetch ffmpeg.wasm core sources
+        run: git clone --depth 1 https://github.com/ffmpegwasm/ffmpeg.wasm.git source
+      - name: Build minimal single-thread core
+        run: |
+          cp hueloop/core-build/Dockerfile source/Dockerfile
+          docker buildx build --output type=local,dest=out source
+      - name: Publish to the CDN branch
+        working-directory: hueloop
+        run: |
+          git checkout --orphan ffmpeg-core
+          git rm -rf .
+          mkdir -p esm
+          cp ../out/dist/esm/ffmpeg-core.js esm/
+          cp ../out/dist/esm/ffmpeg-core.wasm esm/
+          printf '%s\n' 'HueLoop mobile FFmpeg core. Source and build configuration are on main.' > README.md
+          git add esm README.md
+          git -c user.name=github-actions[bot] -c user.email=41898282+github-actions[bot] commit -m 'Publish lightweight FFmpeg core'
+          git push --force origin HEAD:ffmpeg-core
