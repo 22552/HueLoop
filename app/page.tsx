@@ -18,6 +18,17 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+async function prepareStillImage(file: File) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Could not prepare image")), "image/jpeg", 0.92));
+}
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
@@ -107,12 +118,12 @@ export default function Home() {
     setBusy(true); setProgress(0); setFrame(0); setTotalFrames(frameCount); setStatus(engineState === "ready" ? "Starting the renderer…" : "Preparing the FFmpeg engine…");
     try {
       const [{ fetchFile }, ffmpeg] = await Promise.all([import("@ffmpeg/util"), loadFfmpeg()]);
-      setStatus("Painting every frame…");
       const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
-      const inputName = `input.${ext}`;
-      const outputName = `hueloop.${output}`;
-      await ffmpeg.writeFile(inputName, await fetchFile(file));
       const still = !file.type.includes("gif") && file.type.startsWith("image/");
+      const inputName = still ? "input.jpg" : `input.${ext}`;
+      const outputName = `hueloop.${output}`;
+      setStatus(still ? "Preparing image for rendering…" : "Painting every frame…");
+      await ffmpeg.writeFile(inputName, await fetchFile(still ? await prepareStillImage(file) : file));
       // Use the filter's radians option. This is FFmpeg's documented form for
       // an uninterrupted hue rotation: one full 2π revolution per loop.
       const hue = `${direction < 0 ? "-" : ""}2*PI*t/${speed}`;
@@ -146,17 +157,16 @@ export default function Home() {
     } finally { setBusy(false); }
   };
 
-  // The source frame should start at hue 0 (the original colors), not 180°.
   const previewStyle = {
     "--preview-speed": `${speed}s`,
-    "--preview-angle": `${direction * 360}deg`,
     "--preview-saturation": `${saturation}%`,
     "--preview-brightness": `${brightness}%`,
+    animationDirection: direction === 1 ? "normal" : "reverse",
   } as CSSProperties;
 
   return (
     <main>
-      <style>{`@keyframes previewHue { from { filter: hue-rotate(0deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } to { filter: hue-rotate(var(--preview-angle)) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } } .animatedPreview { animation: previewHue var(--preview-speed) linear infinite; }`}</style>
+      <style>{`@keyframes previewHue { 0% { filter: hue-rotate(0deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } 25% { filter: hue-rotate(90deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } 50% { filter: hue-rotate(180deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } 75% { filter: hue-rotate(270deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } 100% { filter: hue-rotate(360deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } } .animatedPreview { animation: previewHue var(--preview-speed) linear infinite; }`}</style>
       {engineState === "preparing" && (
         <div className="engineLoader" role="status" aria-live="polite">
           <div className="loaderMark" />
