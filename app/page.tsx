@@ -192,7 +192,7 @@ export default function Home() {
       )}
       <header className="topbar">
         <a className="brand" href="#top" aria-label="HueLoop home"><span className="brandMark" />HueLoop</a>
-        <span className="private"><LockKeyhole size={14} /> {engineState === "ready" ? "100% local" : engineState === "failed" ? "engine retry on render" : "preparing engine…"}</span>
+        <span className="private"><LockKeyhole size={14} /> {engineState === "ready" ? "local · CDN core 6 MB" : engineState === "failed" ? "engine retry on render" : "preparing engine…"}</span>
       </header>
 
       <section className="hero" id="top">
