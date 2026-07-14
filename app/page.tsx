@@ -18,28 +18,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-async function prepareStillImage(file: File, maxSide: number) {
-  // Resize during decoding so large phone photos do not allocate a huge canvas.
-  const bitmap = await createImageBitmap(file, { resizeWidth: maxSide, resizeHeight: maxSide, resizeQuality: "high" });
-  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Could not prepare image canvas");
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  return new Promise<Blob>((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error("Image preparation took too long — try a smaller image")), 45_000);
-    canvas.toBlob((blob) => {
-      window.clearTimeout(timeout);
-      if (blob) resolve(blob); else reject(new Error("Could not prepare image"));
-    }, "image/jpeg", 0.88);
-  });
-}
-
 export default function Home() {
-  const lowPower = useRef(typeof navigator !== "undefined" && (navigator.maxTouchPoints > 0 || window.innerWidth <= 820)).current;
   const [file, setFile] = useState<File | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
   const [resultUrl, setResultUrl] = useState("");
@@ -48,8 +27,8 @@ export default function Home() {
   const [saturation, setSaturation] = useState(145);
   const [brightness, setBrightness] = useState(100);
   const [direction, setDirection] = useState<1 | -1>(1);
-  const [width, setWidth] = useState(lowPower ? 360 : 480);
-  const [fps, setFps] = useState(lowPower ? 8 : 12);
+  const [width, setWidth] = useState(480);
+  const [fps, setFps] = useState(12);
   const [output, setOutput] = useState<Output>("gif");
   const [progress, setProgress] = useState(0);
   const [frame, setFrame] = useState(0);
@@ -57,7 +36,7 @@ export default function Home() {
   const [status, setStatus] = useState("Ready when you are");
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [engineState, setEngineState] = useState<"idle" | "preparing" | "ready" | "failed">(lowPower ? "idle" : "preparing");
+  const [engineState, setEngineState] = useState<"preparing" | "ready" | "failed">("preparing");
   const ffmpegRef = useRef<import("@ffmpeg/ffmpeg").FFmpeg | null>(null);
   const loadingRef = useRef<Promise<import("@ffmpeg/ffmpeg").FFmpeg> | null>(null);
   const renderInfoRef = useRef({ fps: 12, totalFrames: 0 });
@@ -99,20 +78,13 @@ export default function Home() {
     finally { loadingRef.current = null; }
   }, []);
 
-  useEffect(() => {
-    if (lowPower) return;
-    const timer = window.setTimeout(() => { void loadFfmpeg().catch(() => undefined); }, 150);
-    return () => window.clearTimeout(timer);
-  }, [loadFfmpeg, lowPower]);
-
   const chooseFile = useCallback((next: File | undefined) => {
     if (!next || !(next.type.startsWith("image/") || next.type.startsWith("video/"))) {
       setStatus("Choose an image, GIF, or video file");
       return;
     }
-    const fileLimit = lowPower ? 15 : 100;
-    if (next.size > fileLimit * 1024 * 1024) {
-      setStatus(`That file is over the ${fileLimit} MB limit`);
+    if (next.size > 100 * 1024 * 1024) {
+      setStatus("That file is over the 100 MB limit");
       return;
     }
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
@@ -122,7 +94,7 @@ export default function Home() {
     setResultUrl("");
     setProgress(0);
     setStatus(`${next.name} · ${formatBytes(next.size)}`);
-  }, [lowPower, sourceUrl, resultUrl]);
+  }, [sourceUrl, resultUrl]);
 
   const reset = () => {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
@@ -132,11 +104,8 @@ export default function Home() {
 
   const render = async () => {
     if (!file || busy) return;
-    const renderDuration = lowPower ? Math.min(speed, 4) : speed;
-    const renderFps = lowPower ? Math.min(fps, 8) : fps;
-    const renderWidth = lowPower ? Math.min(width, 360) : width;
-    const frameCount = Math.ceil(renderDuration * renderFps);
-    renderInfoRef.current = { fps: renderFps, totalFrames: frameCount };
+    const frameCount = Math.ceil(speed * fps);
+    renderInfoRef.current = { fps, totalFrames: frameCount };
     setBusy(true); setProgress(0); setFrame(0); setTotalFrames(frameCount); setStatus(engineState === "ready" ? "Starting the renderer…" : "Preparing the FFmpeg engine…");
     try {
       const [{ fetchFile }, ffmpeg] = await Promise.all([import("@ffmpeg/util"), loadFfmpeg()]);
@@ -148,22 +117,22 @@ export default function Home() {
       setProgress(still ? 8 : 15);
       // Let the status paint before decoding a potentially large image.
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      const input = still ? await prepareStillImage(file, lowPower ? 360 : 720) : file;
+      const input = file;
       setStatus("Sending image to renderer…");
       setProgress(15);
       await ffmpeg.writeFile(inputName, await fetchFile(input));
       // Use the filter's radians option. This is FFmpeg's documented form for
       // an uninterrupted hue rotation: one full 2π revolution per loop.
-      const hue = `${direction < 0 ? "-" : ""}2*PI*t/${renderDuration}`;
-      const scale = `scale=${renderWidth}:-2`;
+      const hue = `${direction < 0 ? "-" : ""}2*PI*t/${speed}`;
+      const scale = `scale=${width}:-2`;
       const color = `hue=H=${hue}:s=${saturation / 100},eq=brightness=${(brightness - 100) / 100}`;
       const args = [
         "-y", ...(still ? ["-loop", "1"] : []), "-i", inputName,
-        "-t", String(renderDuration),
-        "-vf", `${scale},${color},fps=${renderFps}`,
+        "-t", String(speed),
+        "-vf", `${scale},${color},fps=${fps}`,
       ];
       if (output === "gif") {
-        args.push("-filter_complex", `[0:v]${scale},${color},fps=${renderFps},split[a][b];[a]palettegen=max_colors=${lowPower ? 64 : 128}[p];[b][p]paletteuse=dither=bayer`, "-loop", "0", outputName);
+        args.push("-filter_complex", `[0:v]${scale},${color},fps=${fps},split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer`, "-loop", "0", outputName);
         const vfAt = args.indexOf("-vf"); args.splice(vfAt, 2);
       } else if (output === "webm") {
         args.push("-an", "-c:v", "libvpx-vp9", "-crf", "35", "-b:v", "0", outputName);
@@ -171,19 +140,16 @@ export default function Home() {
         args.push("-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outputName);
       }
       await ffmpeg.exec(args);
+      // Free the (often much larger) input before copying the result from
+      // FFmpeg's in-memory filesystem into the download Blob.
+      await ffmpeg.deleteFile(inputName);
       const data = await ffmpeg.readFile(outputName);
+      await ffmpeg.deleteFile(outputName);
       const mime = output === "gif" ? "image/gif" : `video/${output}`;
       const blob = new Blob([data as BlobPart], { type: mime });
       if (resultUrl) URL.revokeObjectURL(resultUrl);
       setResultUrl(URL.createObjectURL(blob)); setResultSize(blob.size); setProgress(100);
       setStatus("Your loop is ready");
-      await Promise.allSettled([ffmpeg.deleteFile(inputName), ffmpeg.deleteFile(outputName)]);
-      // Release the Wasm heap as soon as a mobile render is finished.
-      if (lowPower) {
-        ffmpeg.terminate();
-        ffmpegRef.current = null;
-        setEngineState("idle");
-      }
     } catch (error) {
       console.error(error);
       const detail = error instanceof Error ? error.message.replace(/\s+/g, " ").slice(0, 120) : String(error);
@@ -213,7 +179,7 @@ export default function Home() {
       )}
       <header className="topbar">
         <a className="brand" href="#top" aria-label="HueLoop home"><span className="brandMark" />HueLoop</a>
-        <span className="private"><LockKeyhole size={14} /> {engineState === "ready" ? "100% local" : engineState === "failed" ? "engine retry on render" : engineState === "idle" ? "loads on render" : "preparing engine…"}</span>
+        <span className="private"><LockKeyhole size={14} /> {engineState === "ready" ? "100% local" : engineState === "failed" ? "engine retry on render" : "preparing engine…"}</span>
       </header>
 
       <section className="hero" id="top">
@@ -231,12 +197,14 @@ export default function Home() {
               <span className="uploadOrb"><Upload size={28} /></span>
               <strong>Drop something colorful here</strong>
               <span>or tap to browse · PNG, JPG, GIF, WebP, MP4</span>
-              <em>Files stay on your device · max {lowPower ? "15" : "100"} MB</em>
+              <em>Files stay on your device · max 100 MB</em>
             </button>
           ) : (
             <div className="previewFrame">
               <button className="remove" onClick={reset} aria-label="Remove file"><X size={18}/></button>
-              {resultUrl ? (
+              {busy ? (
+                <div className="renderingPreview"><span className="spinner" />Rendering locally…</div>
+              ) : resultUrl ? (
                 output === "gif" ? <img src={resultUrl} alt="Rendered rainbow animation" /> : <video src={resultUrl} autoPlay loop muted playsInline />
               ) : file.type.startsWith("video/") ? (
                 <video className="animatedPreview" src={sourceUrl} autoPlay loop muted playsInline style={previewStyle} />
@@ -251,14 +219,14 @@ export default function Home() {
 
         <aside className="controls">
           <div className="panelHead"><div><small>LOOP SETTINGS</small><h2>Shape the spectrum</h2></div><button onClick={() => {setSpeed(3);setSaturation(145);setBrightness(100);setDirection(1);}} aria-label="Reset controls"><RotateCcw size={17}/></button></div>
-          <label><span>One revolution <b>{lowPower && speed > 4 ? "4" : speed}s</b></span><input type="range" min="1" max={lowPower ? "4" : "12"} step="0.5" value={Math.min(speed, lowPower ? 4 : 12)} onChange={(e) => setSpeed(+e.target.value)}/></label>
+          <label><span>One revolution <b>{speed}s</b></span><input type="range" min="1" max="12" step="0.5" value={speed} onChange={(e) => setSpeed(+e.target.value)}/></label>
           <label><span>Saturation <b>{saturation}%</b></span><input type="range" min="50" max="220" value={saturation} onChange={(e) => setSaturation(+e.target.value)}/></label>
           <label><span>Brightness <b>{brightness}%</b></span><input type="range" min="70" max="130" value={brightness} onChange={(e) => setBrightness(+e.target.value)}/></label>
           <div className="field"><span>Direction</span><div className="segmented"><button className={direction === 1 ? "active" : ""} onClick={() => setDirection(1)}>Forward</button><button className={direction === -1 ? "active" : ""} onClick={() => setDirection(-1)}>Reverse</button></div></div>
-          <div className="field"><span>Quick looks</span><div className="presets">{presets.map((p) => <button key={p.name} onClick={() => {setSpeed(lowPower ? Math.min(p.speed, 4) : p.speed);setSaturation(p.saturation);setBrightness(p.brightness);}}>{p.name}</button>)}</div></div>
+          <div className="field"><span>Quick looks</span><div className="presets">{presets.map((p) => <button key={p.name} onClick={() => {setSpeed(p.speed);setSaturation(p.saturation);setBrightness(p.brightness);}}>{p.name}</button>)}</div></div>
           <div className="divider" />
           <div className="field"><span>Output</span><div className="formatRow">{(["gif","webm","mp4"] as Output[]).map((f) => <button key={f} className={output === f ? "active" : ""} onClick={() => setOutput(f)}>{f.toUpperCase()}</button>)}</div></div>
-          <div className="twoFields"><label><span>Max width</span><select value={width} onChange={(e) => setWidth(+e.target.value)}>{lowPower ? <option value="360">360 px</option> : <><option value="480">480 px</option><option value="640">640 px</option><option value="960">960 px</option></>}</select></label><label><span>Frame rate</span><select value={fps} onChange={(e) => setFps(+e.target.value)}>{lowPower ? <option value="8">8 fps</option> : <><option value="10">10 fps</option><option value="12">12 fps</option><option value="15">15 fps</option><option value="24">24 fps</option></>}</select></label></div>
+          <div className="twoFields"><label><span>Max width</span><select value={width} onChange={(e) => setWidth(+e.target.value)}><option value="480">480 px</option><option value="640">640 px</option><option value="960">960 px</option></select></label><label><span>Frame rate</span><select value={fps} onChange={(e) => setFps(+e.target.value)}><option value="10">10 fps</option><option value="12">12 fps</option><option value="15">15 fps</option><option value="24">24 fps</option></select></label></div>
           <button className="render" disabled={!file || busy} onClick={render}>{busy ? <><span className="spinner"/>Rendering…</> : <><Play size={18} fill="currentColor"/>Make it rainbow</>}</button>
           <button
             className="download"
