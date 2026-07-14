@@ -58,9 +58,18 @@ export default function Home() {
         const { fps, totalFrames } = renderInfoRef.current;
         if (totalFrames) setFrame(Math.min(totalFrames, Math.max(1, Math.floor((time / 1_000_000) * fps) + 1)));
       });
-      const coreBase = "https://cdn.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm";
-      const wasmResponse = await fetch(`${coreBase}/ffmpeg-core.wasm?v=945304d`, { cache: "force-cache" });
-      if (!wasmResponse.ok) throw new Error(`Could not download FFmpeg core (${wasmResponse.status})`);
+      const coreBases = [
+        "https://cdn.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm",
+        "https://fastly.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm",
+      ];
+      setStatus("Finding the fastest FFmpeg CDN…");
+      const wasmRace = await Promise.any(coreBases.map(async (base) => {
+        const response = await fetch(`${base}/ffmpeg-core.wasm?v=945304d`, { cache: "force-cache", mode: "cors" });
+        if (!response.ok) throw new Error(`CDN responded ${response.status}`);
+        return { base, response };
+      }));
+      const coreBase = wasmRace.base;
+      const wasmResponse = wasmRace.response;
       const chunks: Uint8Array[] = [];
       let downloaded = 0;
       const total = Number(wasmResponse.headers.get("content-length")) || 0;
