@@ -94,11 +94,11 @@ export default function Home() {
       const outputName = `hueloop.${output}`;
       await ffmpeg.writeFile(inputName, await fetchFile(file));
       const still = !file.type.includes("gif") && file.type.startsWith("image/");
-      // FFmpeg's hue filter accepts -180°…180°. Map the full 360° cycle into
-      // that range; -180° and 180° are identical, so the loop stays smooth.
-      const hue = direction * 360 / speed;
+      // Use the filter's radians option. This is FFmpeg's documented form for
+      // an uninterrupted hue rotation: one full 2π revolution per loop.
+      const hue = direction * 2 * Math.PI / speed;
       const scale = `scale='min(${width},iw)':-2`;
-      const color = `hue=h=mod(${hue}*t+180\,360)-180:s=${saturation / 100},eq=brightness=${(brightness - 100) / 100}`;
+      const color = `hue=H=${hue}*t:s=${saturation / 100},eq=brightness=${(brightness - 100) / 100}`;
       const args = [
         ...(still ? ["-loop", "1"] : []), "-i", inputName,
         ...(still ? ["-t", String(speed)] : []),
