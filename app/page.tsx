@@ -19,14 +19,23 @@ function formatBytes(bytes: number) {
 }
 
 async function prepareStillImage(file: File) {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
+  // Resize during decoding so large phone photos do not allocate a huge canvas.
+  const bitmap = await createImageBitmap(file, { resizeWidth: 720, resizeHeight: 720, resizeQuality: "high" });
+  const scale = Math.min(1, 720 / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(bitmap.width * scale));
   canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Could not prepare image canvas");
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
-  return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Could not prepare image")), "image/jpeg", 0.92));
+  return new Promise<Blob>((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error("Image preparation took too long — try a smaller image")), 45_000);
+    canvas.toBlob((blob) => {
+      window.clearTimeout(timeout);
+      if (blob) resolve(blob); else reject(new Error("Could not prepare image"));
+    }, "image/jpeg", 0.88);
+  });
 }
 
 export default function Home() {
@@ -125,7 +134,13 @@ export default function Home() {
       const inputName = still ? "input.jpg" : `input.${ext}`;
       const outputName = `hueloop.${output}`;
       setStatus(still ? "Preparing image for rendering…" : "Painting every frame…");
-      await ffmpeg.writeFile(inputName, await fetchFile(still ? await prepareStillImage(file) : file));
+      setProgress(still ? 8 : 15);
+      // Let the status paint before decoding a potentially large image.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      const input = still ? await prepareStillImage(file) : file;
+      setStatus("Sending image to renderer…");
+      setProgress(15);
+      await ffmpeg.writeFile(inputName, await fetchFile(input));
       // Use the filter's radians option. This is FFmpeg's documented form for
       // an uninterrupted hue rotation: one full 2π revolution per loop.
       const hue = `${direction < 0 ? "-" : ""}2*PI*t/${speed}`;
@@ -168,7 +183,7 @@ export default function Home() {
 
   return (
     <main>
-      <style>{`@keyframes previewHue { 0% { filter: hue-rotate(0deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } 25% { filter: hue-rotate(90deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } 50% { filter: hue-rotate(180deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } 75% { filter: hue-rotate(270deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } 100% { filter: hue-rotate(360deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } } .animatedPreview { animation: previewHue var(--preview-speed) linear infinite; }`}</style>
+      <style>{`@keyframes previewHue { 0% { filter: hue-rotate(0deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } 25% { filter: hue-rotate(90deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } 50% { filter: hue-rotate(180deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } 75% { filter: hue-rotate(270deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } 100% { filter: hue-rotate(360deg) saturate(var(--preview-saturation)) brightness(var(--preview-brightness)); } } .animatedPreview { animation: previewHue var(--preview-speed) linear infinite; } .download:disabled { color:#777381; background:#1b1920; border-color:#302d38; cursor:not-allowed; box-shadow:none; }`}</style>
       {engineState === "preparing" && (
         <div className="engineLoader" role="status" aria-live="polite">
           <div className="loaderMark" />
