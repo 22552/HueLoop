@@ -60,8 +60,8 @@ export default function Home() {
       });
       const coreBase = "https://cdn.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm";
       await ffmpeg.load({
-        coreURL: `${coreBase}/ffmpeg-core.js?v=ca9026c`,
-        wasmURL: `${coreBase}/ffmpeg-core.wasm?v=ca9026c`,
+        coreURL: `${coreBase}/ffmpeg-core.js?v=945304d`,
+        wasmURL: `${coreBase}/ffmpeg-core.wasm?v=945304d`,
       });
       ffmpegRef.current = ffmpeg;
       setEngineState("ready");
