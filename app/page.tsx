@@ -27,8 +27,8 @@ export default function Home() {
   const [saturation, setSaturation] = useState(145);
   const [brightness, setBrightness] = useState(100);
   const [direction, setDirection] = useState<1 | -1>(1);
-  const [width, setWidth] = useState(640);
-  const [fps, setFps] = useState(15);
+  const [width, setWidth] = useState(480);
+  const [fps, setFps] = useState(12);
   const [output, setOutput] = useState<Output>("gif");
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("Ready when you are");
@@ -65,7 +65,7 @@ export default function Home() {
 
   const render = async () => {
     if (!file || busy) return;
-    setBusy(true); setProgress(0); setStatus("Loading the local video engine…");
+    setBusy(true); setProgress(0); setStatus("Downloading the FFmpeg engine (about 30 MB, first time only)…");
     try {
       const [{ FFmpeg }, { fetchFile, toBlobURL }] = await Promise.all([
         import("@ffmpeg/ffmpeg"), import("@ffmpeg/util")
@@ -75,9 +75,14 @@ export default function Home() {
         ffmpeg = new FFmpeg();
         ffmpeg.on("progress", ({ progress: p }) => setProgress(Math.min(99, Math.round(p * 100))));
         const core = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm";
+        const [coreURL, wasmURL] = await Promise.all([
+          toBlobURL(`${core}/ffmpeg-core.js`, "text/javascript"),
+          toBlobURL(`${core}/ffmpeg-core.wasm`, "application/wasm"),
+        ]);
+        setStatus("Starting the renderer…");
         await ffmpeg.load({
-          coreURL: await toBlobURL(`${core}/ffmpeg-core.js`, "text/javascript"),
-          wasmURL: await toBlobURL(`${core}/ffmpeg-core.wasm`, "application/wasm"),
+          coreURL,
+          wasmURL,
         });
         ffmpegRef.current = ffmpeg;
       }
@@ -156,8 +161,8 @@ export default function Home() {
             </div>
           )}
           <input ref={inputRef} hidden type="file" accept="image/*,video/*" onChange={(e) => chooseFile(e.target.files?.[0])}/>
-          <div className="statusRow"><span>{status}</span><span>{progress}%</span></div>
-          <div className="progress"><i style={{ width: `${progress}%` }} /></div>
+          <div className="statusRow"><span>{status}</span><span>{busy && progress === 0 ? "working…" : `${progress}%`}</span></div>
+          <div className="progress"><i style={{ width: `${busy && progress === 0 ? 18 : progress}%` }} /></div>
         </div>
 
         <aside className="controls">
@@ -169,7 +174,7 @@ export default function Home() {
           <div className="field"><span>Quick looks</span><div className="presets">{presets.map((p) => <button key={p.name} onClick={() => {setSpeed(p.speed);setSaturation(p.saturation);setBrightness(p.brightness);}}>{p.name}</button>)}</div></div>
           <div className="divider" />
           <div className="field"><span>Output</span><div className="formatRow">{(["gif","webm","mp4"] as Output[]).map((f) => <button key={f} className={output === f ? "active" : ""} onClick={() => setOutput(f)}>{f.toUpperCase()}</button>)}</div></div>
-          <div className="twoFields"><label><span>Max width</span><select value={width} onChange={(e) => setWidth(+e.target.value)}><option value="480">480 px</option><option value="640">640 px</option><option value="960">960 px</option></select></label><label><span>Frame rate</span><select value={fps} onChange={(e) => setFps(+e.target.value)}><option value="10">10 fps</option><option value="15">15 fps</option><option value="24">24 fps</option></select></label></div>
+          <div className="twoFields"><label><span>Max width</span><select value={width} onChange={(e) => setWidth(+e.target.value)}><option value="480">480 px</option><option value="640">640 px</option><option value="960">960 px</option></select></label><label><span>Frame rate</span><select value={fps} onChange={(e) => setFps(+e.target.value)}><option value="10">10 fps</option><option value="12">12 fps</option><option value="15">15 fps</option><option value="24">24 fps</option></select></label></div>
           <button className="render" disabled={!file || busy} onClick={render}>{busy ? <><span className="spinner"/>Rendering…</> : <><Play size={18} fill="currentColor"/>Make it rainbow</>}</button>
           <button
             className="download"
