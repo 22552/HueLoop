@@ -169,7 +169,20 @@ export default function Home() {
           <div className="field"><span>Output</span><div className="formatRow">{(["gif","webm","mp4"] as Output[]).map((f) => <button key={f} className={output === f ? "active" : ""} onClick={() => setOutput(f)}>{f.toUpperCase()}</button>)}</div></div>
           <div className="twoFields"><label><span>Max width</span><select value={width} onChange={(e) => setWidth(+e.target.value)}><option value="480">480 px</option><option value="640">640 px</option><option value="960">960 px</option></select></label><label><span>Frame rate</span><select value={fps} onChange={(e) => setFps(+e.target.value)}><option value="10">10 fps</option><option value="15">15 fps</option><option value="24">24 fps</option></select></label></div>
           <button className="render" disabled={!file || busy} onClick={render}>{busy ? <><span className="spinner"/>Rendering…</> : <><Play size={18} fill="currentColor"/>Make it rainbow</>}</button>
-          {resultUrl && <a className="download" href={resultUrl} download={`hueloop.${output}`}><Download size={18}/>Download {output.toUpperCase()} · {formatBytes(resultSize)}</a>}
+          <button
+            className="download"
+            disabled={!resultUrl}
+            onClick={() => {
+              if (!resultUrl) return;
+              const link = document.createElement("a");
+              link.href = resultUrl;
+              link.download = `hueloop.${output}`;
+              link.click();
+            }}
+          >
+            <Download size={18} />
+            {resultUrl ? `Download ${output.toUpperCase()} · ${formatBytes(resultSize)}` : "Download your loop"}
+          </button>
         </aside>
       </section>
 
