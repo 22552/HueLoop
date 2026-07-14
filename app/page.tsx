@@ -45,19 +45,15 @@ export default function Home() {
     if (ffmpegRef.current) return ffmpegRef.current;
     if (loadingRef.current) return loadingRef.current;
     const job = (async () => {
-      const [{ FFmpeg }, { toBlobURL }] = await Promise.all([
-        import("@ffmpeg/ffmpeg"), import("@ffmpeg/util")
+      const [{ FFmpeg }] = await Promise.all([
+        import("@ffmpeg/ffmpeg")
       ]);
       const ffmpeg = new FFmpeg();
       ffmpeg.on("progress", ({ progress: p }) => setProgress(Math.min(99, Math.round(p * 100))));
-      // Vite loads @ffmpeg/ffmpeg as an ES module, so its core must use the
-      // matching ESM build (the ffmpeg.wasm Vite-specific recommendation).
-      const core = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm";
-      const [coreURL, wasmURL] = await Promise.all([
-        toBlobURL(`${core}/ffmpeg-core.js`, "text/javascript"),
-        toBlobURL(`${core}/ffmpeg-core.wasm`, "application/wasm"),
-      ]);
-      await ffmpeg.load({ coreURL, wasmURL });
+      await ffmpeg.load({
+        coreURL: "/ffmpeg/ffmpeg-core.js",
+        wasmURL: "/ffmpeg/ffmpeg-core.wasm",
+      });
       ffmpegRef.current = ffmpeg;
       setEngineState("ready");
       return ffmpeg;
@@ -138,7 +134,8 @@ export default function Home() {
     } finally { setBusy(false); }
   };
 
-  const previewStyle = { filter: `hue-rotate(${direction * 180}deg) saturate(${saturation}%) brightness(${brightness}%)` };
+  // The source frame should start at hue 0 (the original colors), not 180°.
+  const previewStyle = { filter: `saturate(${saturation}%) brightness(${brightness}%)` };
 
   return (
     <main>
