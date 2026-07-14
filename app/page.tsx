@@ -96,12 +96,12 @@ export default function Home() {
       const still = !file.type.includes("gif") && file.type.startsWith("image/");
       // Use the filter's radians option. This is FFmpeg's documented form for
       // an uninterrupted hue rotation: one full 2π revolution per loop.
-      const hue = direction * 2 * Math.PI / speed;
-      const scale = `scale='min(${width},iw)':-2`;
-      const color = `hue=H=${hue}*t:s=${saturation / 100},eq=brightness=${(brightness - 100) / 100}`;
+      const hue = `${direction < 0 ? "-" : ""}2*PI*t/${speed}`;
+      const scale = `scale=${width}:-2`;
+      const color = `hue=H=${hue}:s=${saturation / 100},eq=brightness=${(brightness - 100) / 100}`;
       const args = [
-        ...(still ? ["-loop", "1"] : []), "-i", inputName,
-        ...(still ? ["-t", String(speed)] : []),
+        "-y", ...(still ? ["-loop", "1"] : []), "-i", inputName,
+        "-t", String(speed),
         "-vf", `${scale},${color},fps=${fps}`,
       ];
       if (output === "gif") {
@@ -121,7 +121,9 @@ export default function Home() {
       setStatus("Your loop is ready");
       await Promise.allSettled([ffmpeg.deleteFile(inputName), ffmpeg.deleteFile(outputName)]);
     } catch (error) {
-      console.error(error); setStatus("Rendering failed — try a smaller file or WebM output");
+      console.error(error);
+      const detail = error instanceof Error ? error.message.replace(/\s+/g, " ").slice(0, 120) : String(error);
+      setStatus(`Rendering failed: ${detail}`);
     } finally { setBusy(false); }
   };
 
