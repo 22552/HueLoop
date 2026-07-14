@@ -34,10 +34,39 @@ export default function Home() {
   const [status, setStatus] = useState("Ready when you are");
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [engineState, setEngineState] = useState<"preparing" | "ready" | "failed">("preparing");
   const ffmpegRef = useRef<import("@ffmpeg/ffmpeg").FFmpeg | null>(null);
+  const loadingRef = useRef<Promise<import("@ffmpeg/ffmpeg").FFmpeg> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => ffmpegRef.current?.terminate(), []);
+
+  const loadFfmpeg = useCallback(async () => {
+    if (ffmpegRef.current) return ffmpegRef.current;
+    if (loadingRef.current) return loadingRef.current;
+    const job = (async () => {
+      const [{ FFmpeg }, { toBlobURL }] = await Promise.all([
+        import("@ffmpeg/ffmpeg"), import("@ffmpeg/util")
+      ]);
+      const ffmpeg = new FFmpeg();
+      ffmpeg.on("progress", ({ progress: p }) => setProgress(Math.min(99, Math.round(p * 100))));
+      const core = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
+      const [coreURL, wasmURL] = await Promise.all([
+        toBlobURL(`${core}/ffmpeg-core.js`, "text/javascript"),
+        toBlobURL(`${core}/ffmpeg-core.wasm`, "application/wasm"),
+      ]);
+      await ffmpeg.load({ coreURL, wasmURL });
+      ffmpegRef.current = ffmpeg;
+      setEngineState("ready");
+      return ffmpeg;
+    })();
+    loadingRef.current = job;
+    try { return await job; }
+    catch (error) { setEngineState("failed"); throw error; }
+    finally { loadingRef.current = null; }
+  }, []);
+
+  useEffect(() => { void loadFfmpeg().catch(() => undefined); }, [loadFfmpeg]);
 
   const chooseFile = useCallback((next: File | undefined) => {
     if (!next || !(next.type.startsWith("image/") || next.type.startsWith("video/"))) {
@@ -65,29 +94,9 @@ export default function Home() {
 
   const render = async () => {
     if (!file || busy) return;
-    setBusy(true); setProgress(0); setStatus("Downloading the FFmpeg engine (about 30 MB, first time only)…");
+    setBusy(true); setProgress(0); setStatus(engineState === "ready" ? "Starting the renderer…" : "Preparing the FFmpeg engine…");
     try {
-      const [{ FFmpeg }, { fetchFile, toBlobURL }] = await Promise.all([
-        import("@ffmpeg/ffmpeg"), import("@ffmpeg/util")
-      ]);
-      let ffmpeg = ffmpegRef.current;
-      if (!ffmpeg) {
-        ffmpeg = new FFmpeg();
-        ffmpeg.on("progress", ({ progress: p }) => setProgress(Math.min(99, Math.round(p * 100))));
-        // UMD build is the browser-compatible distribution recommended by
-        // ffmpeg.wasm. Convert it to Blob URLs to avoid cross-origin workers.
-        const core = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
-        const [coreURL, wasmURL] = await Promise.all([
-          toBlobURL(`${core}/ffmpeg-core.js`, "text/javascript"),
-          toBlobURL(`${core}/ffmpeg-core.wasm`, "application/wasm"),
-        ]);
-        setStatus("Starting the renderer…");
-        await ffmpeg.load({
-          coreURL,
-          wasmURL,
-        });
-        ffmpegRef.current = ffmpeg;
-      }
+      const [{ fetchFile }, ffmpeg] = await Promise.all([import("@ffmpeg/util"), loadFfmpeg()]);
       setStatus("Painting every frame…");
       const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
       const inputName = `input.${ext}`;
@@ -133,7 +142,7 @@ export default function Home() {
     <main>
       <header className="topbar">
         <a className="brand" href="#top" aria-label="HueLoop home"><span className="brandMark" />HueLoop</a>
-        <span className="private"><LockKeyhole size={14} /> 100% local</span>
+        <span className="private"><LockKeyhole size={14} /> {engineState === "ready" ? "100% local" : engineState === "failed" ? "engine retry on render" : "preparing engine…"}</span>
       </header>
 
       <section className="hero" id="top">
