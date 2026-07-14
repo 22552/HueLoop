@@ -64,7 +64,10 @@ export default function Home() {
     finally { loadingRef.current = null; }
   }, []);
 
-  useEffect(() => { void loadFfmpeg().catch(() => undefined); }, [loadFfmpeg]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadFfmpeg().catch(() => undefined); }, 150);
+    return () => window.clearTimeout(timer);
+  }, [loadFfmpeg]);
 
   const chooseFile = useCallback((next: File | undefined) => {
     if (!next || !(next.type.startsWith("image/") || next.type.startsWith("video/"))) {
@@ -139,6 +142,16 @@ export default function Home() {
 
   return (
     <main>
+      {engineState === "preparing" && (
+        <div className="engineLoader" role="status" aria-live="polite">
+          <div className="loaderMark" />
+          <p className="loaderKicker">HUELoop IS WARMING UP</p>
+          <h2>Preparing your<br />local color lab.</h2>
+          <p className="loaderCopy">Downloading the one-time FFmpeg engine<br />so every edit stays on this device.</p>
+          <div className="loaderTrack"><i /></div>
+          <small>Usually cached after the first visit · about 31 MB</small>
+        </div>
+      )}
       <header className="topbar">
         <a className="brand" href="#top" aria-label="HueLoop home"><span className="brandMark" />HueLoop</a>
         <span className="private"><LockKeyhole size={14} /> {engineState === "ready" ? "100% local" : engineState === "failed" ? "engine retry on render" : "preparing engine…"}</span>
