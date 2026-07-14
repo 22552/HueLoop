@@ -59,10 +59,19 @@ export default function Home() {
         if (totalFrames) setFrame(Math.min(totalFrames, Math.max(1, Math.floor((time / 1_000_000) * fps) + 1)));
       });
       const coreBase = "https://cdn.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm";
-      await ffmpeg.load({
+      const loadPromise = ffmpeg.load({
         coreURL: `${coreBase}/ffmpeg-core.js?v=945304d`,
         wasmURL: `${coreBase}/ffmpeg-core.wasm?v=945304d`,
       });
+      let timeout: number | undefined;
+      try {
+        await Promise.race([
+          loadPromise,
+          new Promise<never>((_, reject) => { timeout = window.setTimeout(() => reject(new Error("FFmpeg load timed out — check your connection or reload")), 90_000); }),
+        ]);
+      } finally {
+        if (timeout) window.clearTimeout(timeout);
+      }
       ffmpegRef.current = ffmpeg;
       setEngineState("ready");
       return ffmpeg;
@@ -169,7 +178,16 @@ export default function Home() {
           <h2>Preparing your<br />local color lab.</h2>
           <p className="loaderCopy">Downloading the one-time FFmpeg engine<br />so every edit stays on this device.</p>
           <div className="loaderTrack"><i /></div>
-          <small>Usually cached after the first visit · about 31 MB</small>
+          <small>Usually cached after the first visit · about 6 MB</small>
+        </div>
+      )}
+      {engineState === "failed" && (
+        <div className="engineLoader" role="alert">
+          <div className="loaderMark" />
+          <p className="loaderKicker">FFMPEG COULD NOT START</p>
+          <h2>Engine loading failed.</h2>
+          <p className="loaderCopy">Reload the page and try again.<br />If it keeps failing, check the CDN connection.</p>
+          <button className="render" onClick={() => { setEngineState("preparing"); void loadFfmpeg().catch(() => undefined); }}>Retry FFmpeg</button>
         </div>
       )}
       <header className="topbar">
