@@ -171,6 +171,14 @@ export default function Home() {
       }
       try {
         await ffmpeg.exec(args);
+        if (output === "gif" && ffmpegLogs.current.some((line) => line.includes("No such filter: 'split'"))) {
+          try { await ffmpeg.deleteFile(outputName); } catch {}
+          await ffmpeg.exec([
+            "-y", ...(still ? ["-loop", "1"] : []), "-i", inputName,
+            "-t", String(speed), "-vf", `${scale},${color},fps=${fps}`,
+            "-loop", "0", outputName,
+          ]);
+        }
       } catch (error) {
         // Older cached cores may not include the split filter. Keep GIF export
         // usable with a simpler encoder while the refreshed core propagates.
