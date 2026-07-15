@@ -69,9 +69,9 @@ export default function Home() {
       const coreBase = "/ffmpeg-custom";
       setStatus("Loading FFmpeg Wasm… 0 / about 6.1 MB");
       setProgress(5);
-      const wasmURL = `${coreBase}/ffmpeg-core.wasm?v=945304d`;
+      const wasmURL = `${coreBase}/ffmpeg-core.wasm?v=split-filter-1`;
       const loadPromise = ffmpeg.load({
-        coreURL: `${coreBase}/ffmpeg-core.js?v=945304d`,
+        coreURL: `${coreBase}/ffmpeg-core.js?v=split-filter-1`,
         wasmURL,
       });
       let timeout: number | undefined;
@@ -169,27 +169,7 @@ export default function Home() {
       } else {
         args.push("-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outputName);
       }
-      try {
-        await ffmpeg.exec(args);
-        if (output === "gif" && ffmpegLogs.current.some((line) => line.includes("No such filter: 'split'"))) {
-          try { await ffmpeg.deleteFile(outputName); } catch {}
-          await ffmpeg.exec([
-            "-y", ...(still ? ["-loop", "1"] : []), "-i", inputName,
-            "-t", String(speed), "-vf", `${scale},${color},fps=${fps}`,
-            "-loop", "0", outputName,
-          ]);
-        }
-      } catch (error) {
-        // Older cached cores may not include the split filter. Keep GIF export
-        // usable with a simpler encoder while the refreshed core propagates.
-        if (output !== "gif" || !String(error).includes("split")) throw error;
-        try { await ffmpeg.deleteFile(outputName); } catch {}
-        await ffmpeg.exec([
-          "-y", ...(still ? ["-loop", "1"] : []), "-i", inputName,
-          "-t", String(speed), "-vf", `${scale},${color},fps=${fps}`,
-          "-loop", "0", outputName,
-        ]);
-      }
+      await ffmpeg.exec(args);
       // Free the (often much larger) input before copying the result from
       // FFmpeg's in-memory filesystem into the download Blob.
       await ffmpeg.deleteFile(inputName);
