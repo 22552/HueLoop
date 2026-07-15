@@ -59,8 +59,8 @@ export default function Home() {
         if (totalFrames) setFrame(Math.min(totalFrames, Math.max(1, Math.floor((time / 1_000_000) * fps) + 1)));
       });
       const coreBases = [
-        "https://cdn.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm",
         "https://fastly.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm",
+        "https://cdn.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm",
       ];
       setStatus("Finding the fastest FFmpeg CDN…");
       const wasmRace = await Promise.any(coreBases.map(async (base) => {
