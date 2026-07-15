@@ -58,39 +58,9 @@ export default function Home() {
         const { fps, totalFrames } = renderInfoRef.current;
         if (totalFrames) setFrame(Math.min(totalFrames, Math.max(1, Math.floor((time / 1_000_000) * fps) + 1)));
       });
-      const coreBases = [
-        "https://fastly.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm",
-        "https://cdn.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm",
-      ];
-      setStatus("Finding the fastest FFmpeg CDN…");
-      const wasmRace = await Promise.any(coreBases.map(async (base) => {
-        const response = await fetch(`${base}/ffmpeg-core.wasm?v=945304d`, { cache: "force-cache", mode: "cors" });
-        if (!response.ok) throw new Error(`CDN responded ${response.status}`);
-        return { base, response };
-      }));
-      const coreBase = wasmRace.base;
-      const wasmResponse = wasmRace.response;
-      const chunks: Uint8Array[] = [];
-      let downloaded = 0;
-      const total = Number(wasmResponse.headers.get("content-length")) || 0;
-      if (wasmResponse.body) {
-        const reader = wasmResponse.body.getReader();
-        while (true) {
-          const part = await reader.read();
-          if (part.done) break;
-          if (part.value) {
-            chunks.push(part.value);
-            downloaded += part.value.byteLength;
-            setStatus(`Downloading FFmpeg engine… ${formatBytes(downloaded)}${total ? ` / ${formatBytes(total)}` : ""}`);
-            setProgress(total ? Math.min(99, Math.round(downloaded / total * 100)) : 10);
-          }
-        }
-      } else {
-        const data = new Uint8Array(await wasmResponse.arrayBuffer());
-        chunks.push(data);
-        downloaded = data.byteLength;
-      }
-      const wasmURL = URL.createObjectURL(new Blob(chunks, { type: "application/wasm" }));
+      const coreBase = "https://fastly.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm";
+      setStatus("Loading FFmpeg engine…");
+      const wasmURL = `${coreBase}/ffmpeg-core.wasm?v=945304d`;
       const loadPromise = ffmpeg.load({
         coreURL: `${coreBase}/ffmpeg-core.js?v=945304d`,
         wasmURL,
@@ -103,7 +73,6 @@ export default function Home() {
         ]);
       } finally {
         if (timeout) window.clearTimeout(timeout);
-        URL.revokeObjectURL(wasmURL);
       }
       ffmpegRef.current = ffmpeg;
       setEngineState("ready");
