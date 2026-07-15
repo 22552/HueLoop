@@ -35,6 +35,7 @@ export default function Home() {
   const [totalFrames, setTotalFrames] = useState(0);
   const [status, setStatus] = useState("Ready when you are");
   const [errorDetail, setErrorDetail] = useState("");
+  const ffmpegLogs = useRef<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [engineState, setEngineState] = useState<"preparing" | "ready" | "failed">("preparing");
@@ -57,6 +58,9 @@ export default function Home() {
         import("@ffmpeg/ffmpeg")
       ]);
       const ffmpeg = new FFmpeg();
+      ffmpeg.on("log", ({ message }) => {
+        ffmpegLogs.current = [...ffmpegLogs.current.slice(-19), message];
+      });
       ffmpeg.on("progress", ({ progress: p, time }) => {
         setProgress(Math.min(99, Math.round(p * 100)));
         const { fps, totalFrames } = renderInfoRef.current;
@@ -132,6 +136,7 @@ export default function Home() {
     const frameCount = Math.ceil(speed * fps);
     renderInfoRef.current = { fps, totalFrames: frameCount };
     setBusy(true); setProgress(0); setFrame(0); setTotalFrames(frameCount); setStatus(engineState === "ready" ? "Starting the renderer…" : "Preparing the FFmpeg engine…");
+    ffmpegLogs.current = [];
     try {
       const [{ fetchFile }, ffmpeg] = await Promise.all([import("@ffmpeg/util"), loadFfmpeg()]);
       const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
@@ -177,7 +182,7 @@ export default function Home() {
       setStatus("Your loop is ready");
     } catch (error) {
       console.error(error);
-      const detail = error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ""}` : String(error);
+      const detail = `${error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ""}` : String(error)}\n\nFFmpeg log:\n${ffmpegLogs.current.join("\n")}`;
       setErrorDetail(detail);
       setStatus(`Rendering failed: ${detail}`);
     } finally { setBusy(false); }
