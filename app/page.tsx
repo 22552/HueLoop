@@ -97,6 +97,12 @@ export default function Home() {
     finally { loadingRef.current = null; }
   }, []);
 
+  // Warm up the local engine immediately so the loader reflects real work
+  // instead of waiting until the render button is pressed.
+  useEffect(() => {
+    void loadFfmpeg().catch(() => undefined);
+  }, [loadFfmpeg]);
+
   const chooseFile = useCallback((next: File | undefined) => {
     if (!next || !(next.type.startsWith("image/") || next.type.startsWith("video/"))) {
       setStatus("Choose an image, GIF, or video file");
