@@ -58,7 +58,7 @@ export default function Home() {
         const { fps, totalFrames } = renderInfoRef.current;
         if (totalFrames) setFrame(Math.min(totalFrames, Math.max(1, Math.floor((time / 1_000_000) * fps) + 1)));
       });
-      const coreBase = "https://fastly.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm";
+      const coreBase = "/ffmpeg-custom";
       setStatus("Loading FFmpeg engine…");
       const wasmURL = `${coreBase}/ffmpeg-core.wasm?v=945304d`;
       const loadPromise = ffmpeg.load({
@@ -188,13 +188,13 @@ export default function Home() {
           <div className="loaderMark" />
           <p className="loaderKicker">FFMPEG COULD NOT START</p>
           <h2>Engine loading failed.</h2>
-          <p className="loaderCopy">Reload the page and try again.<br />If it keeps failing, check the CDN connection.</p>
+          <p className="loaderCopy">Reload the page and try again.<br />If it keeps failing, reload the page and try again.</p>
           <button className="render" onClick={() => { setEngineState("preparing"); void loadFfmpeg().catch(() => undefined); }}>Retry FFmpeg</button>
         </div>
       )}
       <header className="topbar">
         <a className="brand" href="#top" aria-label="HueLoop home"><span className="brandMark" />HueLoop</a>
-        <span className="private"><LockKeyhole size={14} /> {engineState === "ready" ? "local · CDN core 6 MB" : engineState === "failed" ? "engine retry on render" : "preparing engine…"}</span>
+        <span className="private"><LockKeyhole size={14} /> {engineState === "ready" ? "local · Pages core 6 MB" : engineState === "failed" ? "engine retry on render" : "preparing engine…"}</span>
       </header>
 
       <section className="hero" id="top">
