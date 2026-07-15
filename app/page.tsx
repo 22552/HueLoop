@@ -34,6 +34,7 @@ export default function Home() {
   const [frame, setFrame] = useState(0);
   const [totalFrames, setTotalFrames] = useState(0);
   const [status, setStatus] = useState("Ready when you are");
+  const [errorDetail, setErrorDetail] = useState("");
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [engineState, setEngineState] = useState<"preparing" | "ready" | "failed">("preparing");
@@ -49,6 +50,9 @@ export default function Home() {
     if (loadingRef.current) return loadingRef.current;
     const job = (async () => {
       setEngineState("preparing");
+      setErrorDetail("");
+      setStatus("Loading FFmpeg JavaScript…");
+      setProgress(1);
       const [{ FFmpeg }] = await Promise.all([
         import("@ffmpeg/ffmpeg")
       ]);
@@ -59,7 +63,8 @@ export default function Home() {
         if (totalFrames) setFrame(Math.min(totalFrames, Math.max(1, Math.floor((time / 1_000_000) * fps) + 1)));
       });
       const coreBase = "/ffmpeg-custom";
-      setStatus("Loading FFmpeg engine…");
+      setStatus("Loading FFmpeg Wasm… 0 / about 6.1 MB");
+      setProgress(5);
       const wasmURL = `${coreBase}/ffmpeg-core.wasm?v=945304d`;
       const loadPromise = ffmpeg.load({
         coreURL: `${coreBase}/ffmpeg-core.js?v=945304d`,
@@ -74,13 +79,21 @@ export default function Home() {
       } finally {
         if (timeout) window.clearTimeout(timeout);
       }
+      setStatus("Initializing FFmpeg worker…");
+      setProgress(90);
       ffmpegRef.current = ffmpeg;
       setEngineState("ready");
       return ffmpeg;
     })();
     loadingRef.current = job;
     try { return await job; }
-    catch (error) { setEngineState("failed"); throw error; }
+    catch (error) {
+      const detail = error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ""}` : String(error);
+      setErrorDetail(detail);
+      setStatus(`FFmpeg failed: ${detail}`);
+      setEngineState("failed");
+      throw error;
+    }
     finally { loadingRef.current = null; }
   }, []);
 
@@ -158,7 +171,8 @@ export default function Home() {
       setStatus("Your loop is ready");
     } catch (error) {
       console.error(error);
-      const detail = error instanceof Error ? error.message.replace(/\s+/g, " ").slice(0, 120) : String(error);
+      const detail = error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ""}` : String(error);
+      setErrorDetail(detail);
       setStatus(`Rendering failed: ${detail}`);
     } finally { setBusy(false); }
   };
@@ -179,6 +193,7 @@ export default function Home() {
           <p className="loaderKicker">HUELoop IS WARMING UP</p>
           <h2>Preparing your<br />local color lab.</h2>
           <p className="loaderCopy">Downloading the one-time FFmpeg engine<br />so every edit stays on this device.</p>
+          <p className="loaderStatus">{status}</p>
           <div className="loaderTrack"><i /></div>
           <small>Usually cached after the first visit · about 6 MB</small>
         </div>
@@ -189,6 +204,7 @@ export default function Home() {
           <p className="loaderKicker">FFMPEG COULD NOT START</p>
           <h2>Engine loading failed.</h2>
           <p className="loaderCopy">Reload the page and try again.<br />If it keeps failing, reload the page and try again.</p>
+          <pre className="errorDetail">{errorDetail || status}</pre>
           <button className="render" onClick={() => { setEngineState("preparing"); void loadFfmpeg().catch(() => undefined); }}>Retry FFmpeg</button>
         </div>
       )}
