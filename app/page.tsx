@@ -169,7 +169,19 @@ export default function Home() {
       } else {
         args.push("-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outputName);
       }
-      await ffmpeg.exec(args);
+      try {
+        await ffmpeg.exec(args);
+      } catch (error) {
+        // Older cached cores may not include the split filter. Keep GIF export
+        // usable with a simpler encoder while the refreshed core propagates.
+        if (output !== "gif" || !String(error).includes("split")) throw error;
+        try { await ffmpeg.deleteFile(outputName); } catch {}
+        await ffmpeg.exec([
+          "-y", ...(still ? ["-loop", "1"] : []), "-i", inputName,
+          "-t", String(speed), "-vf", `${scale},${color},fps=${fps}`,
+          "-loop", "0", outputName,
+        ]);
+      }
       // Free the (often much larger) input before copying the result from
       // FFmpeg's in-memory filesystem into the download Blob.
       await ffmpeg.deleteFile(inputName);
