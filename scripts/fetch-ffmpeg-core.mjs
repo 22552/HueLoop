@@ -5,7 +5,7 @@ const out = "public/ffmpeg-custom";
 await mkdir(out, { recursive: true });
 
 for (const name of ["ffmpeg-core.js", "ffmpeg-core.wasm"]) {
-  const response = await fetch(base + "/" + name + "?v=split-filter-1");
+  const response = await fetch(base + "/" + name + "?v=memory-growth-1");
   if (!response.ok) throw new Error("Failed to fetch " + name + ": HTTP " + response.status);
   const bytes = new Uint8Array(await response.arrayBuffer());
   await writeFile(out + "/" + name, bytes);
