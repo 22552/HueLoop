@@ -35,6 +35,7 @@ export default function Home() {
   const [totalFrames, setTotalFrames] = useState(0);
   const [status, setStatus] = useState("Ready when you are");
   const [errorDetail, setErrorDetail] = useState("");
+  const [debugDetail, setDebugDetail] = useState("");
   const ffmpegLogs = useRef<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -137,8 +138,15 @@ export default function Home() {
     renderInfoRef.current = { fps, totalFrames: frameCount };
     setBusy(true); setProgress(0); setFrame(0); setTotalFrames(frameCount); setStatus(engineState === "ready" ? "Starting the renderer…" : "Preparing the FFmpeg engine…");
     ffmpegLogs.current = [];
+    const debug: string[] = [];
+    const trace = (message: string) => {
+      debug.push(`${new Date().toISOString()} ${message}`);
+      setDebugDetail(debug.join("\n"));
+    };
     try {
+      trace(`render start: file=${file.name}, type=${file.type || "unknown"}, size=${file.size} bytes, output=${output}, width=${width}, fps=${fps}, speed=${speed}`);
       const [{ fetchFile }, ffmpeg] = await Promise.all([import("@ffmpeg/util"), loadFfmpeg()]);
+      trace("FFmpeg instance ready");
       const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
       const still = !file.type.includes("gif") && file.type.startsWith("image/");
       const inputName = still ? "input.jpg" : `input.${ext}`;
@@ -150,7 +158,9 @@ export default function Home() {
       const input = file;
       setStatus("Sending image to renderer…");
       setProgress(15);
+      trace(`writeFile(${inputName}) start`);
       await ffmpeg.writeFile(inputName, await fetchFile(input));
+      trace(`writeFile(${inputName}) complete`);
       // Use the filter's radians option. This is FFmpeg's documented form for
       // an uninterrupted hue rotation: one full 2π revolution per loop.
       const hue = `${direction < 0 ? "-" : ""}2*PI*t/${speed}`;
@@ -169,11 +179,14 @@ export default function Home() {
       } else {
         args.push("-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outputName);
       }
+      trace(`exec args: ${JSON.stringify(args)}`);
       await ffmpeg.exec(args);
+      trace("exec completed");
       // Free the (often much larger) input before copying the result from
       // FFmpeg's in-memory filesystem into the download Blob.
       await ffmpeg.deleteFile(inputName);
       const data = await ffmpeg.readFile(outputName);
+      trace(`readFile(${outputName}) complete: ${typeof data === "string" ? data.length : data.byteLength} bytes`);
       await ffmpeg.deleteFile(outputName);
       const mime = output === "gif" ? "image/gif" : `video/${output}`;
       const blob = new Blob([data as BlobPart], { type: mime });
@@ -182,7 +195,8 @@ export default function Home() {
       setStatus("Your loop is ready");
     } catch (error) {
       console.error(error);
-      const detail = `${error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ""}` : String(error)}\n\nFFmpeg log:\n${ffmpegLogs.current.join("\n")}`;
+      trace(`exception: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`);
+      const detail = `${error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ""}` : String(error)}\n\nDebug trace:\n${debug.join("\n")}\n\nFFmpeg log:\n${ffmpegLogs.current.join("\n")}`;
       setErrorDetail(detail);
       setStatus(`Rendering failed: ${detail}`);
     } finally { setBusy(false); }
@@ -256,6 +270,7 @@ export default function Home() {
           )}
           <input ref={inputRef} hidden type="file" accept="image/*,video/*" onChange={(e) => chooseFile(e.target.files?.[0])}/>
           <div className="statusRow"><span>{busy && frame > 0 ? `Rendering frame ${frame} / ${totalFrames}` : status}</span><span>{busy && frame > 0 ? `${progress}%` : busy && progress === 0 ? "working…" : `${progress}%`}</span></div>
+          {debugDetail && <details className="debugPanel"><summary>Debug trace</summary><pre>{debugDetail}</pre></details>}
           <div className="progress"><i style={{ width: `${busy && progress === 0 ? 18 : progress}%` }} /></div>
         </div>
 
