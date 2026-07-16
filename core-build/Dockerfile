@@ -54,7 +54,7 @@ COPY src/bind /src/src/bind
 COPY src/fftools /src/src/fftools
 COPY build/ffmpeg-wasm.sh /src/build.sh
 ENV FFMPEG_LIBS="-lx264 -lvpx -lz"
-RUN mkdir -p /src/dist/esm && bash -x /src/build.sh $FFMPEG_LIBS -sEXPORT_ES6 -s INITIAL_MEMORY=33554432 -o /src/dist/esm/ffmpeg-core.js
+RUN mkdir -p /src/dist/esm && bash -x /src/build.sh $FFMPEG_LIBS -sEXPORT_ES6 -s INITIAL_MEMORY=67108864 -s ALLOW_MEMORY_GROWTH=1 -o /src/dist/esm/ffmpeg-core.js
 
 FROM scratch AS export
 COPY --from=wasm-builder /src/dist /dist
