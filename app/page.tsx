@@ -70,9 +70,9 @@ export default function Home() {
       const coreBase = "/ffmpeg-custom";
       setStatus("Loading FFmpeg Wasm… 0 / about 6.1 MB");
       setProgress(5);
-      const wasmURL = `${coreBase}/ffmpeg-core.wasm?v=memory-growth-1`;
+      const wasmURL = `${coreBase}/ffmpeg-core.wasm?v=memory-growth-2`;
       const loadPromise = ffmpeg.load({
-        coreURL: `${coreBase}/ffmpeg-core.js?v=memory-growth-1`,
+        coreURL: `${coreBase}/ffmpeg-core.js?v=memory-growth-2`,
         wasmURL,
       });
       let timeout: number | undefined;
