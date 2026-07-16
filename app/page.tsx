@@ -172,7 +172,7 @@ export default function Home() {
         "-vf", `${scale},${color},fps=${fps}`,
       ];
       if (output === "gif") {
-        args.push("-filter_complex", `[0:v]${scale},${color},fps=${fps},split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer`, "-loop", "0", outputName);
+        args.push("-filter_complex", `[0:v]${scale},${color},fps=${fps},split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer`, "-loop", "0", "-f", "gif", outputName);
         const vfAt = args.indexOf("-vf"); args.splice(vfAt, 2);
       } else if (output === "webm") {
         args.push("-an", "-c:v", "libvpx-vp9", "-crf", "35", "-b:v", "0", outputName);
@@ -182,11 +182,13 @@ export default function Home() {
       trace(`exec args: ${JSON.stringify(args)}`);
       await ffmpeg.exec(args);
       trace("exec completed");
-      // Free the (often much larger) input before copying the result from
-      // FFmpeg's in-memory filesystem into the download Blob.
-      await ffmpeg.deleteFile(inputName);
+      // Read the output before cleaning up the input. This makes a missing
+      // output distinguishable from a cleanup race in the virtual filesystem.
       const data = await ffmpeg.readFile(outputName);
       trace(`readFile(${outputName}) complete: ${typeof data === "string" ? data.length : data.byteLength} bytes`);
+      // Free the (often much larger) input after copying the result.
+      try { await ffmpeg.deleteFile(inputName); trace(`deleteFile(${inputName}) complete`); }
+      catch (cleanupError) { trace(`cleanup warning: ${String(cleanupError)}`); }
       await ffmpeg.deleteFile(outputName);
       const mime = output === "gif" ? "image/gif" : `video/${output}`;
       const blob = new Blob([data as BlobPart], { type: mime });
