@@ -277,7 +277,7 @@ export default function Home() {
             </div>
           )}
           <input ref={inputRef} hidden type="file" accept="image/*,video/*" onChange={(e) => chooseFile(e.target.files?.[0])}/>
-          <div className="statusRow"><span>{busy && frame > 0 ? `Rendering frame ${frame} / ${totalFrames}` : status}</span><span>{busy && frame > 0 ? `${progress}%` : busy && progress === 0 ? "working…" : `${progress}%`}</span></div>
+          <div className="statusRow"><span>{busy && frame > 0 ? `${progress}% · Rendering frame ${frame} / ${totalFrames}` : `${progress}% · ${status}`}</span><span>{busy ? "processing" : resultUrl ? "complete" : "idle"}</span></div>
           {debugDetail && <details className="debugPanel"><summary>Debug trace</summary><pre>{debugDetail}</pre></details>}
           <div className="progress"><i style={{ width: `${busy && progress === 0 ? 18 : progress}%` }} /></div>
         </div>
