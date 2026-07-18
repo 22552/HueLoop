@@ -1,5 +1,3 @@
-
-✓ built in 307ms
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
