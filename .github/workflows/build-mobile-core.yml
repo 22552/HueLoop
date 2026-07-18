@@ -1,5 +1,6 @@
 name: Build HueLoop mobile FFmpeg core
 
+# Rebuild after memory-growth and output-file fixes.
 on:
   workflow_dispatch:
   push:
