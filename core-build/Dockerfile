@@ -39,7 +39,7 @@ COPY --from=libvpx-builder $INSTALL_DIR $INSTALL_DIR
 COPY --from=zlib-builder $INSTALL_DIR $INSTALL_DIR
 COPY build/ffmpeg.sh /src/build.sh
 RUN bash -x /src/build.sh \
-  --enable-gpl --disable-pthreads --disable-w32threads --disable-os2-threads \
+  --enable-gpl --disable-pthreads --disable-w32threads --disable-os2threads \
   --disable-everything --enable-libx264 --enable-libvpx --enable-zlib \
   --enable-encoder=gif --enable-encoder=libx264 --enable-encoder=libvpx-vp9 \
   --enable-decoder=png --enable-decoder=mjpeg --enable-decoder=gif --enable-decoder=webp \
