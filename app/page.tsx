@@ -68,11 +68,12 @@ export default function Home() {
         if (totalFrames) setFrame(Math.min(totalFrames, Math.max(1, Math.floor((time / 1_000_000) * fps) + 1)));
       });
       const coreBase = "/ffmpeg-custom";
+      const coreVersion = Date.now().toString();
       setStatus("Loading FFmpeg Wasm… 0 / about 6.1 MB");
       setProgress(5);
-      const wasmURL = `${coreBase}/ffmpeg-core.wasm?v=memory-growth-2`;
+      const wasmURL = `${coreBase}/ffmpeg-core.wasm?v=${coreVersion}`;
       const loadPromise = ffmpeg.load({
-        coreURL: `${coreBase}/ffmpeg-core.js?v=memory-growth-2`,
+        coreURL: `${coreBase}/ffmpeg-core.js?v=${coreVersion}`,
         wasmURL,
       });
       let timeout: number | undefined;
@@ -172,7 +173,7 @@ export default function Home() {
         "-vf", `${scale},${color},fps=${fps}`,
       ];
       if (output === "gif") {
-        args.push("-filter_complex", `[0:v]${scale},${color},fps=${fps},split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer`, "-loop", "0", "-f", "gif", outputName);
+        args.push("-filter_complex", `[0:v]${scale},${color},fps=${fps},split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer[v]`, "-map", "[v]", "-loop", "0", "-f", "gif", outputName);
         const vfAt = args.indexOf("-vf"); args.splice(vfAt, 2);
       } else if (output === "webm") {
         args.push("-an", "-c:v", "libvpx-vp9", "-crf", "35", "-b:v", "0", outputName);
