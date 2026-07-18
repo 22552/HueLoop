@@ -1,3 +1,4 @@
+// Deploy marker: use rebuilt FFmpeg core with trim support.
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
