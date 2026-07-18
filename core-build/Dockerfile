@@ -48,7 +48,7 @@ RUN bash -x /src/build.sh \
   --enable-muxer=gif --enable-muxer=mp4 --enable-muxer=webm \
   --enable-parser=h264 --enable-parser=vp9 --enable-protocol=file \
   --enable-filter=hue --enable-filter=scale --enable-filter=fps --enable-filter=eq \
-  --enable-filter=palettegen --enable-filter=paletteuse --enable-filter=split --enable-filter=format
+  --enable-filter=palettegen --enable-filter=paletteuse --enable-filter=split --enable-filter=format --enable-filter=trim
 
 FROM ffmpeg-builder AS wasm-builder
 COPY src/bind /src/src/bind
