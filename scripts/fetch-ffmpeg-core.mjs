@@ -1,12 +1,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
 
-const base = "https://fastly.jsdelivr.net/gh/22552/HueLoop@ffmpeg-core/esm";
+const base = "https://raw.githubusercontent.com/22552/HueLoop/ffmpeg-core/esm";
 const out = "public/ffmpeg-custom";
 const cacheBust = Date.now();
 await mkdir(out, { recursive: true });
 
 for (const name of ["ffmpeg-core.js", "ffmpeg-core.wasm"]) {
-  const response = await fetch(base + "/" + name + "?v=memory-growth-2-" + cacheBust);
+  const response = await fetch(base + "/" + name + "?v=memory-growth-raw-" + cacheBust);
   if (!response.ok) throw new Error("Failed to fetch " + name + ": HTTP " + response.status);
   const bytes = new Uint8Array(await response.arrayBuffer());
   await writeFile(out + "/" + name, bytes);
