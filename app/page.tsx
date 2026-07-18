@@ -186,7 +186,11 @@ export default function Home() {
       // Read the output before cleaning up the input. This makes a missing
       // output distinguishable from a cleanup race in the virtual filesystem.
       const data = await ffmpeg.readFile(outputName);
-      trace(`readFile(${outputName}) complete: ${typeof data === "string" ? data.length : data.byteLength} bytes`);
+      const outputBytes = typeof data === "string" ? data.length : data.byteLength;
+      trace(`readFile(${outputName}) complete: ${outputBytes} bytes`);
+      if (outputBytes === 0) {
+        throw new Error(`FFmpeg created an empty ${outputName}; refusing to enable download. This usually means the Wasm core aborted (OOM) or the output muxer failed.`);
+      }
       // Keep the original input in the virtual filesystem and in the preview.
       // The next render overwrites the same filename when a new file is chosen.
       trace(`kept original input: ${inputName}`);
