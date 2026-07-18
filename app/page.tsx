@@ -1,3 +1,5 @@
+
+✓ built in 307ms
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
@@ -187,9 +189,9 @@ export default function Home() {
       // output distinguishable from a cleanup race in the virtual filesystem.
       const data = await ffmpeg.readFile(outputName);
       trace(`readFile(${outputName}) complete: ${typeof data === "string" ? data.length : data.byteLength} bytes`);
-      // Free the (often much larger) input after copying the result.
-      try { await ffmpeg.deleteFile(inputName); trace(`deleteFile(${inputName}) complete`); }
-      catch (cleanupError) { trace(`cleanup warning: ${String(cleanupError)}`); }
+      // Keep the original input in the virtual filesystem and in the preview.
+      // The next render overwrites the same filename when a new file is chosen.
+      trace(`kept original input: ${inputName}`);
       await ffmpeg.deleteFile(outputName);
       const mime = output === "gif" ? "image/gif" : `video/${output}`;
       const blob = new Blob([data as BlobPart], { type: mime });
