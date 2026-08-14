@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 
-// Immutable artifact source. Bump this commit only after rebuilding/reviewing
-// the ffmpeg-core branch output.
-const coreCommit = "30d4d16169984ce7a61db32c75e885bf382b7a1c";
+// Immutable artifact source. This commit was produced by the pinned-source
+// build workflow; bump it only after intentionally rebuilding/reviewing core.
+const coreCommit = "55b048be46448a13c7c3a3179757a656e52cc7e3";
 const base = `https://raw.githubusercontent.com/22552/HueLoop/${coreCommit}/esm`;
 const out = "public/ffmpeg-custom";
 
