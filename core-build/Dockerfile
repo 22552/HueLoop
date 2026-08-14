@@ -1,11 +1,10 @@
 # Rebuild marker: keep the generated core in sync with this memory configuration.
-# HueLoop's browser-only FFmpeg core.  It intentionally contains just the
+# HueLoop's browser-only FFmpeg core. It intentionally contains just the
 # containers/formats and filters that the editor exposes.
 FROM emscripten/emsdk:3.1.40 AS base
 ARG EXTRA_CFLAGS
 ARG EXTRA_LDFLAGS
 ENV INSTALL_DIR=/opt
-ENV FFMPEG_VERSION=n5.1.4
 ENV CFLAGS="-I$INSTALL_DIR/include $CFLAGS $EXTRA_CFLAGS"
 ENV CXXFLAGS="$CFLAGS"
 ENV LDFLAGS="-L$INSTALL_DIR/lib $LDFLAGS $CFLAGS $EXTRA_LDFLAGS"
@@ -15,25 +14,26 @@ ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$EM_PKG_CONFIG_PATH
 RUN apt-get update && apt-get install -y pkg-config autoconf automake libtool ragel && rm -rf /var/lib/apt/lists/*
 
 FROM base AS x264-builder
-ENV X264_BRANCH=4-cores
-ADD https://github.com/ffmpegwasm/x264.git#$X264_BRANCH /src
+# ffmpegwasm/x264 branch 4-cores, pinned to an immutable commit.
+ADD https://github.com/ffmpegwasm/x264.git#33cac6b77d5b9259c552156013a817ab23119612 /src
 COPY build/x264.sh /src/build.sh
 RUN bash -x /src/build.sh
 
 FROM base AS libvpx-builder
-ENV LIBVPX_BRANCH=v1.13.1
-ADD https://github.com/ffmpegwasm/libvpx.git#$LIBVPX_BRANCH /src
+# ffmpegwasm/libvpx tag v1.13.1 -> commit below.
+ADD https://github.com/ffmpegwasm/libvpx.git#10b9492dcf05b652e2e4b370e205bd605d421972 /src
 COPY build/libvpx.sh /src/build.sh
 RUN bash -x /src/build.sh
 
 FROM base AS zlib-builder
-ENV ZLIB_BRANCH=v1.2.11
-ADD https://github.com/ffmpegwasm/zlib.git#$ZLIB_BRANCH /src
+# ffmpegwasm/zlib tag v1.2.11 -> commit below.
+ADD https://github.com/ffmpegwasm/zlib.git#cacf7f1d4e3d44d871b605da3b647f07d718623f /src
 COPY build/zlib.sh /src/build.sh
 RUN bash -x /src/build.sh
 
 FROM base AS ffmpeg-builder
-ADD https://github.com/FFmpeg/FFmpeg.git#$FFMPEG_VERSION /src
+# FFmpeg tag n5.1.4 -> commit below.
+ADD https://github.com/FFmpeg/FFmpeg.git#4729204c17f756e186d622060088371d10b34f7e /src
 COPY --from=x264-builder $INSTALL_DIR $INSTALL_DIR
 COPY --from=libvpx-builder $INSTALL_DIR $INSTALL_DIR
 COPY --from=zlib-builder $INSTALL_DIR $INSTALL_DIR
