@@ -16,11 +16,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: hueloop
-      - name: Fetch ffmpeg.wasm core sources
-        run: git clone --depth 1 https://github.com/ffmpegwasm/ffmpeg.wasm.git source
+      - name: Fetch pinned ffmpeg.wasm core sources
+        run: |
+          git init source
+          git -C source remote add origin https://github.com/ffmpegwasm/ffmpeg.wasm.git
+          git -C source fetch --depth 1 origin f876f907c7e9b9bf51d4ed0b913a855a63ae63fc
+          git -C source checkout --detach FETCH_HEAD
       - name: Build minimal single-thread core
         run: |
           cp hueloop/core-build/Dockerfile source/Dockerfile
